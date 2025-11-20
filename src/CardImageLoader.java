@@ -1,0 +1,80 @@
+import javax.swing.*;
+import java.awt.*;
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+
+public class CardImageLoader {
+
+    private final String baseDir;          // 예: "src/cardimg/"
+    private final int width;
+    private final int height;
+
+    // 한번 로드한 이미지 재사용
+    private final Map<String, ImageIcon> cache = new HashMap<>();
+    private ImageIcon backCard;
+
+    public CardImageLoader(String baseDir, int width, int height) {
+        // 마지막에 / 가 없으면 붙여주기
+        if (!baseDir.endsWith("/") && !baseDir.endsWith("\\")) {
+            baseDir = baseDir + "/";
+        }
+        this.baseDir = baseDir;
+        this.width = width;
+        this.height = height;
+
+        // 뒷면 카드 이미지 파일명은 CardBack.png 라고 가정
+        backCard = loadAndScale("CardBack.png");
+    }
+
+    /** 앞면 카드 이미지 */
+    public ImageIcon getCardImage(Card card) {
+        String fileName = buildFileName(card);   // 예: "SA.png"
+        return cache.computeIfAbsent(fileName, this::loadAndScale);
+    }
+
+    /** 뒷면 카드 이미지 */
+    public ImageIcon getBackImage() {
+        return backCard;
+    }
+
+    /** Card -> 파일명 규칙 매핑 */
+    private String buildFileName(Card card) {
+        String suitPrefix;
+        switch (card.getSuit()) {
+            case SPADES -> suitPrefix = "S";
+            case HEARTS -> suitPrefix = "H";
+            case DIAMONDS -> suitPrefix = "D";
+            case CLUBS -> suitPrefix = "C";
+            default -> suitPrefix = "";
+        }
+
+        String rankPart;
+        switch (card.getRank()) {
+            case ACE -> rankPart = "A";
+            case JACK -> rankPart = "J";
+            case QUEEN -> rankPart = "Q";
+            case KING -> rankPart = "K";
+            default -> rankPart = String.valueOf(card.getRank().getValue()); // 2~10
+        }
+
+        // 최종 파일명 예: "SA.png" (스페이드 A)
+        return suitPrefix + rankPart + ".png";
+    }
+
+    /** 실제 파일에서 이미지 로드 + 스케일링 */
+    private ImageIcon loadAndScale(String fileName) {
+        String fullPath = baseDir + fileName;   // 예: "src/cardimg/SA.png"
+        File f = new File(fullPath);
+
+        if (!f.exists()) {
+            System.err.println("❌ 이미지 파일을 찾을 수 없음: " + fullPath);
+            return null;
+        }
+
+        ImageIcon icon = new ImageIcon(fullPath);
+        Image scaled = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        //System.out.println("✅ 로드 성공: " + fullPath);
+        return new ImageIcon(scaled);
+    }
+}
