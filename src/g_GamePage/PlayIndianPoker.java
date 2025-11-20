@@ -147,11 +147,14 @@ public class PlayIndianPoker extends JFrame {
         pot += payAnte(user, ANTE) + payAnte(enemy, ANTE);
 
         // 🔹 라운드 시작 시 — 상대 카드 뒷면 / 내 카드 앞면
-        setEnemyCardFaceDown();
-        setUserCardFaceUp(userCard);
+        // 라운드 시작 시 - 내 카드가 뒷면 / 상대 카드가 앞면 
+        //setEnemyCardFaceDown();
+        //setUserCardFaceUp(userCard);
+        setUserCardFaceDown();
+        setEnemyCardFaceUp(enemyCard);
 
         updatePotText();
-        setInfoText("상대 카드가 가려져 있습니다. CALL / FOLD 중 선택하세요.");
+        setInfoText("본인 카드가 가려져 있습니다. CALL / FOLD 중 선택하세요.");
         lblMoney.setText(statusMoneyText());
 
         btnCall.setEnabled(true);
@@ -189,7 +192,7 @@ public class PlayIndianPoker extends JFrame {
     private void revealAndSettle() {
         phase = Phase.REVEAL;
 
-        // 🔹 결과 공개 시 — 상대 카드 앞면으로 변경
+        // 🔹 결과 공개 시 —  내 카드 앞면으로 변경
         setEnemyCardFaceUp(enemyCard);
         setUserCardFaceUp(userCard);
 
@@ -219,13 +222,15 @@ public class PlayIndianPoker extends JFrame {
             setUserCardFaceUp(userCard);
             setEnemyCardFaceUp(enemyCard);
         }
-
+       
         updatePotText();
         lblMoney.setText(statusMoneyText());
 
         btnCall.setEnabled(false);
         btnFold.setEnabled(false);
         btnNext.setEnabled(true);
+       
+        
     }
 
     // ===== 유틸 =====
@@ -268,9 +273,13 @@ public class PlayIndianPoker extends JFrame {
     private void updatePotText() { lblPot.setText("POT: " + pot); }
 
     // 🔹 카드 표시 함수들
-    private void setEnemyCardFaceUp(Card c) { lblEnemyCard.setIcon(loadCardFrontIcon(c)); }
-    private void setEnemyCardFaceDown() { lblEnemyCard.setIcon(loadBackIcon()); }
+    //private void setEnemyCardFaceUp(Card c) { lblEnemyCard.setIcon(loadCardFrontIcon(c)); }
+    //private void setEnemyCardFaceDown() { lblEnemyCard.setIcon(loadBackIcon()); }
+    //private void setUserCardFaceUp(Card c) { lblUserCard.setIcon(loadCardFrontIcon(c)); }
     private void setUserCardFaceUp(Card c) { lblUserCard.setIcon(loadCardFrontIcon(c)); }
+    private void setUserCardFaceDown() { lblEnemyCard.setIcon(loadBackIcon()); }
+    private void setEnemyCardFaceUp(Card c) { lblEnemyCard.setIcon(loadCardFrontIcon(c)); }
+    
 
     // ===== 이미지 로드 =====
     private Icon loadCardFrontIcon(Card c) {
