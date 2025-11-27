@@ -153,10 +153,6 @@ public class IndianPokerServer {
             String action1 = cmd1[0];
             String action2 = cmd2[0];
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 477ca06 (Update branch)
             /**
              * 승패 계산 규칙:
              *   - 한쪽이 FOLD하면 다른 쪽이 무조건 승리
@@ -164,13 +160,6 @@ public class IndianPokerServer {
              *   - 같으면 pot을 반씩 나눔
              */
             // Player1 Action
-<<<<<<< HEAD
-            if (action1.equals("FOLD")) {
-            	p2Money += pot;
-            	sendBothResult("LOSE", "WIN", c1, c2);
-            	return true;
-            }
-=======
             if (action1.equals("FOLD") && action2.equals("FOLD")) {
                 pot = 0;
                 sendBothResult("DRAW", "DRAW", c1, c2);
@@ -215,7 +204,6 @@ public class IndianPokerServer {
                 return true;        // 다음 라운드 계속
             }
 
->>>>>>> 477ca06 (Update branch)
             if (action1.equals("ALLIN")) {
                 betP1 += p1Money;
                 pot += p1Money;
@@ -243,14 +231,6 @@ public class IndianPokerServer {
             }
             
             // Player2 Action
-<<<<<<< HEAD
-            if (action2.equals("FOLD")) {
-                p1Money += pot;
-                sendBothResult("WIN", "LOSE", c1, c2);
-                return true;
-            }
-=======
->>>>>>> 477ca06 (Update branch)
 
             if (action2.equals("ALLIN")) {
                 betP2 += p2Money;
