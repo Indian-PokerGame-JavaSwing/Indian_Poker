@@ -153,7 +153,10 @@ public class IndianPokerServer {
             String action1 = cmd1[0];
             String action2 = cmd2[0];
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 477ca06 (Update branch)
             /**
              * 승패 계산 규칙:
              *   - 한쪽이 FOLD하면 다른 쪽이 무조건 승리
@@ -161,11 +164,58 @@ public class IndianPokerServer {
              *   - 같으면 pot을 반씩 나눔
              */
             // Player1 Action
+<<<<<<< HEAD
             if (action1.equals("FOLD")) {
             	p2Money += pot;
             	sendBothResult("LOSE", "WIN", c1, c2);
             	return true;
             }
+=======
+            if (action1.equals("FOLD") && action2.equals("FOLD")) {
+                pot = 0;
+                sendBothResult("DRAW", "DRAW", c1, c2);
+
+                // 혹시 이 시점에 누군가 0원이면 게임 종료
+                if (p1Money <= 0 || p2Money <= 0) {
+                    String winner = (p1Money > p2Money) ? "Player1" : "Player2";
+                    send(out1, "GAMEOVER " + winner);
+                    send(out2, "GAMEOVER " + winner);
+                    return false;   // 게임 끝
+                }
+
+                return true;        // 그냥 다음 라운드 진행
+            }
+         // Player1만 폴드
+            if (action1.equals("FOLD")) {
+                p2Money += pot;
+                sendBothResult("LOSE", "WIN", c1, c2);
+
+                if (p1Money <= 0 || p2Money <= 0) {
+                    String winner = (p1Money > p2Money) ? "Player1" : "Player2";
+                    send(out1, "GAMEOVER " + winner);
+                    send(out2, "GAMEOVER " + winner);
+                    return false;   // 게임 끝
+                }
+
+                return true;        // 다음 라운드 계속
+            }
+
+         // Player2만 폴드
+            if (action2.equals("FOLD")) {
+                p1Money += pot;
+                sendBothResult("WIN", "LOSE", c1, c2);
+
+                if (p1Money <= 0 || p2Money <= 0) {
+                    String winner = (p1Money > p2Money) ? "Player1" : "Player2";
+                    send(out1, "GAMEOVER " + winner);
+                    send(out2, "GAMEOVER " + winner);
+                    return false;   // 게임 끝
+                }
+
+                return true;        // 다음 라운드 계속
+            }
+
+>>>>>>> 477ca06 (Update branch)
             if (action1.equals("ALLIN")) {
                 betP1 += p1Money;
                 pot += p1Money;
@@ -193,11 +243,14 @@ public class IndianPokerServer {
             }
             
             // Player2 Action
+<<<<<<< HEAD
             if (action2.equals("FOLD")) {
                 p1Money += pot;
                 sendBothResult("WIN", "LOSE", c1, c2);
                 return true;
             }
+=======
+>>>>>>> 477ca06 (Update branch)
 
             if (action2.equals("ALLIN")) {
                 betP2 += p2Money;

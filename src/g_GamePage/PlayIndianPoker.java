@@ -269,6 +269,10 @@ public class PlayIndianPoker extends JFrame {
                     setInfo("결과: " + result + " (다음 라운드를 기다리는 중...)");
                 });
                 break;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 477ca06 (Update branch)
                 // ------------------------------------
                 //  GAMEOVER : 최종 승리자
                 // ------------------------------------
