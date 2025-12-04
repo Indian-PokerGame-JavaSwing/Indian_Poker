@@ -131,7 +131,7 @@ public class PlayIndianPoker extends JFrame {
         				JOptionPane.WARNING_MESSAGE);
         		return;
         	}
-        	sendToServer("RAISE"+raiseAmount);
+        	sendToServer("RAISE "+raiseAmount);
         	
         });
         btnAllIn.addActionListener(e -> sendToServer("ALLIN"));
