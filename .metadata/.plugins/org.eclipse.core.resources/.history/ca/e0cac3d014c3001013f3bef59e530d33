@@ -1,0 +1,61 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class FlipCard extends JLabel {
+
+    private ImageIcon frontImage;
+    private ImageIcon backImage;
+    private boolean showingFront = false;
+
+    private double scaleX = 1.0; // 1.0 = 정상 크기, 0 = 완전히 좁아짐
+
+    public FlipCard(ImageIcon frontImage, ImageIcon backImage) {
+        this.frontImage = frontImage;
+        this.backImage = backImage;
+        setIcon(backImage); // 기본은 카드 뒷면
+    }
+
+    public void setFrontImage(ImageIcon frontImage) { this.frontImage = frontImage; }
+    public void setBackImage(ImageIcon backImage) { this.backImage = backImage; }
+
+    public void flip() {
+
+        Timer timer = new Timer(10, null);
+
+        timer.addActionListener(e -> {
+
+            scaleX -= 0.05;
+
+            if (scaleX <= 0) {
+                scaleX = 0;
+                showingFront = !showingFront;
+
+                setIcon(showingFront ? frontImage : backImage);
+            }
+
+            if (scaleX <= -1) {
+                scaleX = 1;
+                timer.stop();
+            }
+
+            repaint();
+        });
+
+        timer.start();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g;
+
+        int w = getWidth();
+        int h = getHeight();
+
+        int scaledWidth = (int) (w * Math.abs(scaleX));
+
+        g2.translate((w - scaledWidth) / 2, 0);
+        g2.scale(Math.abs(scaleX), 1);
+
+        super.paintComponent(g2);
+    }
+}

@@ -1,0 +1,72 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class FlipCard extends JLabel {
+
+    private Image frontImage;
+    private Image backImage;
+
+    private boolean showingFront = false;
+    private boolean flipping = false;
+    private double scaleX = 1.0;
+
+    public FlipCard(ImageIcon front, ImageIcon back) {
+        setFrontImage(front);
+        setBackImage(back);
+        setIcon(back);
+    }
+
+    public void setFrontImage(ImageIcon img) {
+        if (img != null)
+            this.frontImage = img.getImage();
+    }
+
+    public void setBackImage(ImageIcon img) {
+        if (img != null)
+            this.backImage = img.getImage();
+    }
+
+    public void flip() {
+        if (flipping) return; // 애니메이션 중복 방지
+        flipping = true;
+
+        Timer timer = new Timer(12, e -> {
+
+            scaleX -= 0.08;
+
+            if (scaleX <= 0) {
+                scaleX = 0;
+                showingFront = !showingFront;
+            }
+
+            if (scaleX <= -1.0) {
+                scaleX = 1.0;
+                flipping = false;
+                ((Timer) e.getSource()).stop();
+            }
+
+            repaint();
+        });
+
+        timer.start();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        if (frontImage == null || backImage == null) return;
+
+        Graphics2D g2 = (Graphics2D) g.create();
+
+        int w = getWidth();
+        int h = getHeight();
+        int scaledWidth = (int) (w * Math.abs(scaleX));
+
+        Image img = showingFront ? frontImage : backImage;
+
+        g2.drawImage(img, (w - scaledWidth) / 2, 0, scaledWidth, h, this);
+
+        g2.dispose();
+    }
+}
