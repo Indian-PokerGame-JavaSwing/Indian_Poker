@@ -4,214 +4,130 @@ import java.io.*;
 import java.net.*;
 import normalclass.*;
 
-/**
- * IndianPokerServer
- * -----------------------------------------
- * 역할:
- *   - 두 명의 클라이언트 접속(Player1, Player2)을 기다림
- *   - 두 플레이어가 연결되면 GameRoom 스레드를 생성하여 게임 진행
- *   - GameRoom에서는 라운드를 무한 반복하며
- *     카드 배분, 베팅 처리, 승패 판정, 돈 분배 등 모든 게임 로직을 처리한다.
- *
- * 클라이언트는 단순히 UI와 CALL/FOLD 입력만 담당하고,
- * 게임 규칙은 전부 서버에서 관리한다.
- */
 public class IndianPokerServer {
 
     private static final int PORT = 50000;
+    private static final int CHAT_PORT = 50001;
     private static final int ANTE = 10;
 
     public static void main(String[] args) {
         System.out.println("IndianPokerServer: waiting on port " + PORT);
 
-        try (ServerSocket listener = new ServerSocket(PORT)) {
+        try (ServerSocket listener = new ServerSocket(PORT);
+             ServerSocket chatListener = new ServerSocket(CHAT_PORT)) {
 
-            // 1) 첫 번째 플레이어 접속 대기
             Socket p1 = listener.accept();
-            System.out.println("Player1 connected");
+            System.out.println("Player1 connected (game)");
+            
+            Socket p1Chat = chatListener.accept();
+            System.out.println("Player1 connected (chat)");
 
-            // 2) 두 번째 플레이어 접속 대기
             Socket p2 = listener.accept();
-            System.out.println("Player2 connected");
+            System.out.println("Player2 connected (game)");
+            
+            Socket p2Chat = chatListener.accept();
+            System.out.println("Player2 connected (chat)");
 
-            // 3) 플레이어 두 명이 모두 연결되면 게임방 스레드 시작
-            new GameRoom(p1, p2).start();
+            new 
+            GameRoom(p1, p2, p1Chat, p2Chat).start();
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * GameRoom
-     * -----------------------------------------
-     * - Player1, Player2 각각의 소켓과 I/O 스트림을 관리
-     * - Dealer를 이용해 카드 셔플/배분
-     * - 라운드를 무한 반복
-     * - ROUND 메시지 전송 -> CALL/FOLD 수신 -> 승패 계산 -> RESULT 전송
-     */
     static class GameRoom extends Thread {
 
         private Socket s1, s2;
+        private Socket chatS1, chatS2;
         private BufferedReader in1, in2;
         private BufferedWriter out1, out2;
+        private BufferedReader chatIn1, chatIn2;
+        private BufferedWriter chatOut1, chatOut2;
 
         private Dealer dealer = new Dealer();
-
-        // 플레이어 돈 (서버는 각 플레이어 돈을 반드시 따로 보관)
         private int p1Money = 200, p2Money = 200;
+        private int pot;
+        private volatile boolean running = true;
 
-        private int pot; // 현재 라운드 팟 금액
-
-        public GameRoom(Socket s1, Socket s2) {
+        public GameRoom(Socket s1, Socket s2, Socket chatS1, Socket chatS2) {
             this.s1 = s1;
             this.s2 = s2;
+            this.chatS1 = chatS1;
+            this.chatS2 = chatS2;
             dealer.shuffle();
         }
 
         @Override
         public void run() {
             try {
-                // 소켓 스트림 준비
                 in1 = new BufferedReader(new InputStreamReader(s1.getInputStream()));
                 out1 = new BufferedWriter(new OutputStreamWriter(s1.getOutputStream()));
-
                 in2 = new BufferedReader(new InputStreamReader(s2.getInputStream()));
                 out2 = new BufferedWriter(new OutputStreamWriter(s2.getOutputStream()));
 
-                // 🔥 라운드 무한 반복 실행
+                chatIn1 = new BufferedReader(new InputStreamReader(chatS1.getInputStream()));
+                chatOut1 = new BufferedWriter(new OutputStreamWriter(chatS1.getOutputStream()));
+                chatIn2 = new BufferedReader(new InputStreamReader(chatS2.getInputStream()));
+                chatOut2 = new BufferedWriter(new OutputStreamWriter(chatS2.getOutputStream()));
+                
+                startChatListeners();
+
                 while (true) {
-                	
-                	boolean continueGame = playRound(); // 라운드 진행
-                	
-                	if (!continueGame) {
-                		System.out.println("Game finished. Closing server thread.");
-                		break;
-                	} 
-                	
-                	Thread.sleep(1500);
-                	
+                    boolean continueGame = playRound();
+                    if (!continueGame) {
+                        System.out.println("Game finished.");
+                        running = false;
+                        break;
+                    }
+                    Thread.sleep(1500);
                 }
                 
                 try { s1.close(); } catch (Exception ignored) {}
                 try { s2.close(); } catch (Exception ignored) {}
+                try { chatS1.close(); } catch (Exception ignored) {}
+                try { chatS2.close(); } catch (Exception ignored) {}
 
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
 
-        /**
-         * 1 라운드 진행
-         * ----------------------------
-         * 순서:
-         *   1) 카드 두 장 배분
-         *   2) 각 플레이어 앤티(ANTE) 차감 → pot 증가
-         *   3) ROUND 메시지 전송 (각자 상대 카드만 보냄)
-         *   4) CALL/FOLD 입력 대기
-         *   5) 승패 계산 후 RESULT 메시지 전송
-         * @return 
-         */
         private boolean playRound() throws IOException {
-        	
-        	int currentBet = ANTE;
-        	int betP1 = ANTE;
-        	int betP2 = ANTE;
-
+            
             pot = 0;
+            int betP1 = ANTE;
+            int betP2 = ANTE;
 
-            // 1) 카드 배분
-            Card c1 = dealer.dealOne(); // Player1 카드
-            Card c2 = dealer.dealOne(); // Player2 카드
+            Card c1 = dealer.dealOne();
+            Card c2 = dealer.dealOne();
 
-            // 2) 앤티 차감
             p1Money -= ANTE;
             p2Money -= ANTE;
             pot = betP1 + betP2;
 
-            /**
-             * ROUND 메시지 규칙
-             *   ROUND myMoney enemyMoney pot visibleCardNum visibleCardShape
-             *
-             * Player1 → Player2 카드가 보이도록 전송
-             * Player2 → Player1 카드가 보이도록 전송
-             */
             send(out1, "ROUND " + p1Money + " " + p2Money + " " + pot + " " + c2.getCNum() + " " + c2.getCShape());
             send(out2, "ROUND " + p2Money + " " + p1Money + " " + pot + " " + c1.getCNum() + " " + c1.getCShape());
 
+            boolean p1Folded = false;
+            boolean p2Folded = false;
+            int currentBet = ANTE;
             
-            // 3) CALL/FOLD 입력 받기 (둘 다 blocking read) 
+            // === Player1 턴 ===
+            send(out1, "YOUR_TURN");
+            send(out2, "WAIT_TURN");
             
-            //기존 코드
-            //String a1 = in1.readLine(); // CALL 또는 FOLD
-            //String a2 = in2.readLine();
-           
-            // 수정된 코드
-            String [] cmd1 = in1.readLine().split(" ");
-            String [] cmd2 = in2.readLine().split(" ");
-            
+            String[] cmd1 = in1.readLine().split(" ", 2);
             String action1 = cmd1[0];
-            String action2 = cmd2[0];
-
-            /**
-             * 승패 계산 규칙:
-             *   - 한쪽이 FOLD하면 다른 쪽이 무조건 승리
-             *   - 둘 다 CALL이면 카드 숫자 비교
-             *   - 같으면 pot을 반씩 나눔
-             */
-            // Player1 Action
-            if (action1.equals("FOLD") && action2.equals("FOLD")) {
-                pot = 0;
-                sendBothResult("DRAW", "DRAW", c1, c2);
-
-                // 혹시 이 시점에 누군가 0원이면 게임 종료
-                if (p1Money <= 0 || p2Money <= 0) {
-                    String winner = (p1Money > p2Money) ? "Player1" : "Player2";
-                    send(out1, "GAMEOVER " + winner);
-                    send(out2, "GAMEOVER " + winner);
-                    return false;   // 게임 끝
-                }
-
-                return true;        // 그냥 다음 라운드 진행
-            }
-         // Player1만 폴드
+            
             if (action1.equals("FOLD")) {
-                p2Money += pot;
-                sendBothResult("LOSE", "WIN", c1, c2);
-
-                if (p1Money <= 0 || p2Money <= 0) {
-                    String winner = (p1Money > p2Money) ? "Player1" : "Player2";
-                    send(out1, "GAMEOVER " + winner);
-                    send(out2, "GAMEOVER " + winner);
-                    return false;   // 게임 끝
-                }
-
-                return true;        // 다음 라운드 계속
-            }
-
-         // Player2만 폴드
-            if (action2.equals("FOLD")) {
-                p1Money += pot;
-                sendBothResult("WIN", "LOSE", c1, c2);
-
-                if (p1Money <= 0 || p2Money <= 0) {
-                    String winner = (p1Money > p2Money) ? "Player1" : "Player2";
-                    send(out1, "GAMEOVER " + winner);
-                    send(out2, "GAMEOVER " + winner);
-                    return false;   // 게임 끝
-                }
-
-                return true;        // 다음 라운드 계속
-            }
-
-            if (action1.equals("ALLIN")) {
+                p1Folded = true;
+            } else if (action1.equals("ALLIN")) {
                 betP1 += p1Money;
                 pot += p1Money;
                 p1Money = 0;
                 currentBet = betP1;
-            }
-
-            if (action1.equals("RAISE")) {
+            } else if (action1.equals("RAISE")) {
                 int raiseAmount = Integer.parseInt(cmd1[1]);
                 if (p1Money >= raiseAmount) {
                     p1Money -= raiseAmount;
@@ -219,9 +135,7 @@ public class IndianPokerServer {
                     currentBet = betP1;
                     pot = betP1 + betP2;
                 }
-            }
-
-            if (action1.equals("CALL")) {
+            } else if (action1.equals("CALL")) {
                 int diff = currentBet - betP1;
                 if (p1Money >= diff) {
                     p1Money -= diff;
@@ -230,26 +144,38 @@ public class IndianPokerServer {
                 }
             }
             
-            // Player2 Action
-
-            if (action2.equals("ALLIN")) {
+            send(out1, "POT_UPDATE " + pot + " " + p1Money + " " + p2Money + " " + currentBet);
+            send(out2, "POT_UPDATE " + pot + " " + p2Money + " " + p1Money + " " + currentBet);
+            
+            if (p1Folded) {
+                p2Money += pot;
+                sendBothResult("LOSE", "WIN", c1, c2);
+                return checkGameOver();
+            }
+            
+            // === Player2 턴 ===
+            send(out2, "YOUR_TURN");
+            send(out1, "WAIT_TURN");
+            
+            String[] cmd2 = in2.readLine().split(" ", 2);
+            String action2 = cmd2[0];
+            
+            if (action2.equals("FOLD")) {
+                p2Folded = true;
+            } else if (action2.equals("ALLIN")) {
                 betP2 += p2Money;
                 pot += p2Money;
                 p2Money = 0;
-                currentBet = betP2;
-            }
-
-            if (action2.equals("RAISE")) {
+                currentBet = Math.max(currentBet, betP2);
+            } else if (action2.equals("RAISE")) {
                 int raiseAmount = Integer.parseInt(cmd2[1]);
                 if (p2Money >= raiseAmount) {
                     p2Money -= raiseAmount;
                     betP2 += raiseAmount;
-                    currentBet = betP2;
+                    currentBet = Math.max(currentBet, betP2);
                     pot = betP1 + betP2;
                 }
-            }
-
-            if (action2.equals("CALL")) {
+            } else if (action2.equals("CALL")) {
                 int diff = currentBet - betP2;
                 if (p2Money >= diff) {
                     p2Money -= diff;
@@ -258,21 +184,29 @@ public class IndianPokerServer {
                 }
             }
             
-         // 카드 값 계산 (A = 14 처리)
+            send(out1, "POT_UPDATE " + pot + " " + p1Money + " " + p2Money + " " + currentBet);
+            send(out2, "POT_UPDATE " + pot + " " + p2Money + " " + p1Money + " " + currentBet);
+            
+            if (p2Folded) {
+                p1Money += pot;
+                sendBothResult("WIN", "LOSE", c1, c2);
+                return checkGameOver();
+            }
+            
+            // Player2가 베팅 완료 → 즉시 결과 판정!
+            // (Player1 추가 턴 없음)
+            
+            // 승패 판정
             int v1 = (c1.getCNum() == 1 ? 14 : c1.getCNum());
             int v2 = (c2.getCNum() == 1 ? 14 : c2.getCNum());
             
-            // 승패 판정
             if (v1 > v2) {
                 p1Money += pot;
                 sendBothResult("WIN", "LOSE", c1, c2);
-
             } else if (v1 < v2) {
                 p2Money += pot;
                 sendBothResult("LOSE", "WIN", c1, c2);
-
             } else {
-                // 무승부 분배
                 p1Money += pot / 2;
                 p2Money += pot - (pot / 2);
                 sendBothResult("DRAW", "DRAW", c1, c2);
@@ -280,45 +214,25 @@ public class IndianPokerServer {
             
             try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
 
-            // 덱 재정비
             if (dealer.remaining() < 10) {
                 dealer.reset();
                 dealer.shuffle();
-                
             }
-            // 승리 조건
+            
+            return checkGameOver();
+        }
+        
+        private boolean checkGameOver() throws IOException {
             if (p1Money <= 0 || p2Money <= 0) {
-            	
-            	String winner = (p1Money > p2Money) ? "Player1" : "Player2";
-            	
-            	send(out1, "GAMEOVER "+winner);
-            	send(out2, "GAMEOVER "+winner);
-            	
-            	return false;
+                String winner = (p1Money > p2Money) ? "Player1" : "Player2";
+                send(out1, "GAMEOVER " + winner);
+                send(out2, "GAMEOVER " + winner);
+                return false;
             }
-           
-			return true;
-
-            // 카드가 거의 없으면 새 덱 생성
-           
+            return true;
         }
 
-        /**
-         * 두 플레이어에게 각각 결과 메시지 전송
-         * ---------------------------------------
-         * RESULT 메시지 규칙:
-         *
-         *   RESULT <result> <myNum> <myShape> <enemyNum> <enemyShape> <myMoney> <enemyMoney>
-         *
-         * 클라이언트는 이 메시지를 받아
-         *   - 자신의 카드
-         *   - 상대 카드
-         *   - 승/패/무승부
-         *   - 최신 돈
-         * 을 UI에 표시함.
-         */
         private void sendBothResult(String r1, String r2, Card c1, Card c2) throws IOException {
-
             send(out1, "RESULT " + r1 + " "
                     + c1.getCNum() + " " + c1.getCShape() + " "
                     + c2.getCNum() + " " + c2.getCShape() + " "
@@ -330,16 +244,35 @@ public class IndianPokerServer {
                     + p2Money + " " + p1Money);
         }
 
-
-
-        /**
-         * 클라이언트에게 메시지 전송
-         * ----------------------------
-         * \n 붙여서 out.flush() 해야 클라이언트가 readLine()에서 받음.
-         */
         private static void send(BufferedWriter out, String msg) throws IOException {
             out.write(msg + "\n");
             out.flush();
+        }
+        
+        private void startChatListeners() {
+            new Thread(() -> {
+                try {
+                    String line;
+                    while (running && (line = chatIn1.readLine()) != null) {
+                        send(chatOut2, line);
+                        System.out.println("[P1→P2] " + line);
+                    }
+                } catch (Exception e) {
+                    if (running) e.printStackTrace();
+                }
+            }).start();
+            
+            new Thread(() -> {
+                try {
+                    String line;
+                    while (running && (line = chatIn2.readLine()) != null) {
+                        send(chatOut1, line);
+                        System.out.println("[P2→P1] " + line);
+                    }
+                } catch (Exception e) {
+                    if (running) e.printStackTrace();
+                }
+            }).start();
         }
     }
 }

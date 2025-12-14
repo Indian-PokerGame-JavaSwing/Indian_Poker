@@ -3,26 +3,12 @@ package normalclass;
 import java.util.ArrayList;
 import java.util.Collections;
 
-/**
- * Dealer 클래스
- *
- * 역할:
- *   - 서버에서 사용되는 "카드 덱 관리" 전용 클래스
- *   - 52장의 카드 생성 / 셔플 / 카드 한 장씩 배분 기능 제공
- *
- * 클라이언트(PlayIndianPoker)는 게임 로직을 가지지 않기 때문에
- * Dealer는 오직 서버(IndianPokerServer)에서만 사용된다.
- */
 public class Dealer {
 
     // 52장의 카드를 저장할 리스트
     private ArrayList<Card> deck;
 
-    /**
-     * 생성자
-     * 객체 생성 시 자동으로 덱을 초기화(reset)하고
-     * 카드를 섞기(shuffle) 위해 reset에서 전체 카드 생성
-     */
+    // 객체 생성 시 자동으로 덱을 초기화(reset)하고 카드를 섞기(shuffle) 위해 reset에서 전체 카드 생성
     public Dealer() {
         reset();
     }
